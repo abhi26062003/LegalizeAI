@@ -3,8 +3,13 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY=AIzaSyCPJ82AcuGw8WyFhAvgRdUkJukYL3KCNSk"))
 
-model = genai.GenerativeModel('gemini-1.5-flash')
-response = model.generate_content("Say: Connection Successful")
-print(response.text)
+api_key = os.getenv("GOOGLE_API_KEY")
+
+if not api_key:
+    print("Error: API Key not found! Check your .env file or Streamlit Secrets.")
+else:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content("Say: Connection Successful")
+    print(response.text)
