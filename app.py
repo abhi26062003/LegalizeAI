@@ -11,7 +11,11 @@ st.set_page_config(page_title="Legalize AI", page_icon="⚖️", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    /* Chatbot Box Styling */
+    /* Hide Streamlit default footer/menu */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
     .chat-box {
         border: 2px solid #007bff;
         border-radius: 15px;
@@ -39,10 +43,20 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. INITIALIZATION ---
+# --- 2. INITIALIZATION & SIDEBAR ---
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"
 client = genai.Client(api_key=api_key, http_options={'api_version': 'v1beta'})
+
+# Language Selector Sidebar
+with st.sidebar:
+    st.title("🌐 Settings")
+    target_language = st.selectbox(
+        "Choose Analysis Language",
+        ["English", "French", "Spanish", "Portuguese", "Chinese", "Korean", "Tagalog", "Indonesian"],
+        index=0
+    )
+    st.info(f"The AI will now provide all audits and chat responses in **{target_language}**.")
 
 # Navigation & State Control
 if "current_page" not in st.session_state:
@@ -71,10 +85,12 @@ if st.session_state.current_page == "upload":
                 raw_text = extract_text(uploaded_file)
                 st.session_state.contract_text = raw_text
                 
-                # Prompt with Strict Emoji requirement
+                # Updated Prompt with Language Instruction
                 prompt = f"""
                 Act as a casual, friendly legal expert. Explain this contract using LOTS of emojis.
                 Break it down like I'm 15 years old.
+                
+                IMPORTANT: You MUST provide the entire response in {target_language}.
                 
                 Structure:
                 - 🛡️ SAFETY SCORE (1 to 10)
@@ -92,7 +108,6 @@ if st.session_state.current_page == "upload":
                 except Exception as e:
                     st.error(f"AI Error: {e}")
 
-    # Show navigation button ONLY if analysis is done
     if st.session_state.analysis_result:
         st.success("Analysis complete! Click below to see the results.")
         if st.button("➡️ View Full Audit Report"):
@@ -103,7 +118,7 @@ if st.session_state.current_page == "upload":
 elif st.session_state.current_page == "results":
     col_head, col_back = st.columns([8, 2])
     with col_head:
-        st.title("⚖️ Audit Results & AI Assistant")
+        st.title(f"⚖️ Results in {target_language}")
     with col_back:
         if st.button("🏠 New Upload"):
             st.session_state.current_page = "upload"
@@ -111,7 +126,6 @@ elif st.session_state.current_page == "results":
             st.session_state.messages = []
             st.rerun()
 
-    # Split Screen: Left (Report) | Right (Chatbot)
     left_col, right_col = st.columns([1.5, 1], gap="large")
 
     with left_col:
@@ -122,17 +136,15 @@ elif st.session_state.current_page == "results":
 
     with right_col:
         st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-        st.subheader("💬 Chat with Document")
+        st.subheader(f"💬 Chat ({target_language})")
         
-        # Chat Display
         chat_display = st.container(height=400)
         with chat_display:
             for m in st.session_state.messages:
                 with st.chat_message(m["role"]):
                     st.markdown(m["content"])
 
-        # Chat Input inside the right-side area
-        if query := st.chat_input("Ask a specific question..."):
+        if query := st.chat_input(f"Ask a question in {target_language}..."):
             st.session_state.messages.append({"role": "user", "content": query})
             with chat_display:
                 with st.chat_message("user"):
@@ -140,7 +152,8 @@ elif st.session_state.current_page == "results":
                 
                 with st.chat_message("assistant"):
                     ctx = st.session_state.contract_text
-                    full_p = f"Based on this text: {ctx[:8000]}\nAnswer this: {query}"
+                    # Updated Chat Prompt for Language Consistency
+                    full_p = f"Based on this text: {ctx[:8000]}\nAnswer this question in {target_language}: {query}"
                     res = client.models.generate_content(model="gemini-2.5-flash", contents=full_p)
                     st.markdown(res.text)
                     st.session_state.messages.append({"role": "assistant", "content": res.text})
@@ -149,7 +162,7 @@ elif st.session_state.current_page == "results":
 # --- 5. GLOBAL FOOTER ---
 st.markdown(f"""
     <div class="disclaimer-box">
-        ⚠️ <b>Disclaimer:</b> I am Ai, i want giving you answer based on provided data and it does not authentic with your real world senerio. 
-        This tool is for educational purposes only and does not substitute for real-world legal advice.
+        ⚠️ <b>Disclaimer:</b> I am AI, I provide answers based on provided data which may not reflect real-world legal scenarios. 
+        This tool is for educational purposes only and does not substitute for professional legal advice.
     </div>
     """, unsafe_allow_html=True)
