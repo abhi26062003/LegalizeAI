@@ -11,11 +11,14 @@ st.set_page_config(page_title="Legalize AI", page_icon="⚖️", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
-    /* Hide Streamlit default footer/menu */
+    
+    /* Hide Streamlit default footer/menu and your GitHub badge */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
+    .stAppDeployButton {display:none;} 
+
+    /* Chatbot Box Styling */
     .chat-box {
         border: 2px solid #007bff;
         border-radius: 15px;
@@ -43,20 +46,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. INITIALIZATION & SIDEBAR ---
+# --- 2. INITIALIZATION ---
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY") or "YOUR_API_KEY_HERE"
 client = genai.Client(api_key=api_key, http_options={'api_version': 'v1beta'})
-
-# Language Selector Sidebar
-with st.sidebar:
-    st.title("🌐 Settings")
-    target_language = st.selectbox(
-        "Choose Analysis Language",
-        ["English", "French", "Spanish", "Portuguese", "Chinese", "Korean", "Tagalog", "Indonesian"],
-        index=0
-    )
-    st.info(f"The AI will now provide all audits and chat responses in **{target_language}**.")
 
 # Navigation & State Control
 if "current_page" not in st.session_state:
@@ -72,7 +65,18 @@ def extract_text(pdf_file):
     reader = pypdf.PdfReader(pdf_file)
     return "\n".join([p.extract_text() for p in reader.pages if p.extract_text()])
 
-# --- 3. PAGE 1: UPLOAD & ANALYZE ---
+# --- 3. TOP NAVIGATION BAR (Language at Top Right) ---
+# We create two columns: one for the title/spacer, and a small one at the right for language
+nav_left, nav_right = st.columns([8, 2])
+
+with nav_right:
+    target_language = st.selectbox(
+        "🌐 Language",
+        ["English", "French", "Spanish", "Portuguese", "Chinese", "Korean", "Tagalog", "Indonesian"],
+        index=0
+    )
+
+# --- 4. PAGE 1: UPLOAD & ANALYZE ---
 if st.session_state.current_page == "upload":
     st.title("⚖️ Legalize AI: Smart Contract Auditor")
     st.subheader("Step 1: Upload Your Document 📝")
@@ -85,7 +89,7 @@ if st.session_state.current_page == "upload":
                 raw_text = extract_text(uploaded_file)
                 st.session_state.contract_text = raw_text
                 
-                # Updated Prompt with Language Instruction
+                # Prompt with Strict Language Requirement
                 prompt = f"""
                 Act as a casual, friendly legal expert. Explain this contract using LOTS of emojis.
                 Break it down like I'm 15 years old.
@@ -109,16 +113,16 @@ if st.session_state.current_page == "upload":
                     st.error(f"AI Error: {e}")
 
     if st.session_state.analysis_result:
-        st.success("Analysis complete! Click below to see the results.")
+        st.success(f"Analysis complete in {target_language}!")
         if st.button("➡️ View Full Audit Report"):
             st.session_state.current_page = "results"
             st.rerun()
 
-# --- 4. PAGE 2: RESULTS & CHATBOT ---
+# --- 5. PAGE 2: RESULTS & CHATBOT ---
 elif st.session_state.current_page == "results":
     col_head, col_back = st.columns([8, 2])
     with col_head:
-        st.title(f"⚖️ Results in {target_language}")
+        st.title(f"⚖️ Results ({target_language})")
     with col_back:
         if st.button("🏠 New Upload"):
             st.session_state.current_page = "upload"
@@ -136,7 +140,7 @@ elif st.session_state.current_page == "results":
 
     with right_col:
         st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-        st.subheader(f"💬 Chat ({target_language})")
+        st.subheader(f"💬 Chat Assistant")
         
         chat_display = st.container(height=400)
         with chat_display:
@@ -144,7 +148,7 @@ elif st.session_state.current_page == "results":
                 with st.chat_message(m["role"]):
                     st.markdown(m["content"])
 
-        if query := st.chat_input(f"Ask a question in {target_language}..."):
+        if query := st.chat_input(f"Ask in {target_language}..."):
             st.session_state.messages.append({"role": "user", "content": query})
             with chat_display:
                 with st.chat_message("user"):
@@ -152,14 +156,13 @@ elif st.session_state.current_page == "results":
                 
                 with st.chat_message("assistant"):
                     ctx = st.session_state.contract_text
-                    # Updated Chat Prompt for Language Consistency
                     full_p = f"Based on this text: {ctx[:8000]}\nAnswer this question in {target_language}: {query}"
                     res = client.models.generate_content(model="gemini-2.5-flash", contents=full_p)
                     st.markdown(res.text)
                     st.session_state.messages.append({"role": "assistant", "content": res.text})
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 5. GLOBAL FOOTER ---
+# --- 6. GLOBAL FOOTER ---
 st.markdown(f"""
     <div class="disclaimer-box">
         ⚠️ <b>Disclaimer:</b> I am AI, I provide answers based on provided data which may not reflect real-world legal scenarios. 
